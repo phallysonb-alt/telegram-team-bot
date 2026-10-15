@@ -15,7 +15,7 @@ def write_export(data,dest=None):
  runtime=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node';node=os.environ.get('DAILY_NODE') or shutil.which('node') or str(runtime/'bin/node.exe');module=Path(os.environ.get('DAILY_ARTIFACT_MODULE') or (runtime if (runtime/'node_modules/@oai/artifact-tool').exists() else ROOT/'scripts'));token=uuid.uuid4().hex;source=dest.parent/(token+'.json');temp=dest.parent/(token+'.xlsx');source.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8');env=dict(os.environ,DAILY_ARTIFACT_MODULE=str(module))
  try:
   if (module/'node_modules/@oai/artifact-tool').exists():
-   result=subprocess.run([node,str(ROOT/'scripts/progress_xlsx.mjs'),str(source),str(temp)],capture_output=True,env=env,timeout=180)
+   result=subprocess.run([node,str(ROOT/'scripts/progress_xlsx.mjs'),str(source),str(temp)],capture_output=True,stdin=subprocess.DEVNULL,env=env,timeout=180,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
    if result.returncode:raise ValueError('进度历史导出暂不可用，请重试；反馈记录已保留')
   else:
    from .progress_portable_xlsx import write

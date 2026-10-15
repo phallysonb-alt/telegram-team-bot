@@ -228,7 +228,7 @@ def write_excel(data,path):
     token=uuid.uuid4().hex;source=path.parent/(token+'.json');temp=path.parent/(token+'.xlsx')
     source.write_text(dumps(data),encoding='utf-8')
     try:
-        proc=subprocess.run([node,str(ROOT/'scripts/daily_xlsx.mjs'),str(source),str(temp)],env=env,capture_output=True,timeout=180)
+        proc=subprocess.run([node,str(ROOT/'scripts/daily_xlsx.mjs'),str(source),str(temp)],env=env,capture_output=True,stdin=subprocess.DEVNULL,timeout=180,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         if proc.returncode:raise RuntimeError('Excel生成失败；退出码'+str(proc.returncode))
         import zipfile
         with zipfile.ZipFile(temp) as z:
