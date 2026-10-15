@@ -17,7 +17,7 @@ class MiniAppTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.fixture=test_progress_rounds.ProgressTests();self.fixture.setUp()
         self.p=self.fixture.p;self.s=self.fixture.s;self.c=self.fixture.c;self.u=self.fixture.u;self.v=self.fixture.v;self.r=self.fixture.r
-        self.env=patch.dict(os.environ,{'PROGRESS_MINIAPP_LINK':'https://t.me/csg6gbot/work','PROGRESS_MINIAPP_ENABLED':'true'});self.env.start()
+        self.env=patch.dict(os.environ,{'PROGRESS_MINIAPP_LINK':'https://t.me/example_team_bot/work','PROGRESS_MINIAPP_ENABLED':'true'});self.env.start()
         self.membership=AsyncMock();self.api=MiniAPI(self.p,self.fixture.ctx.bot,self.membership)
     def tearDown(self):self.env.stop();self.fixture.tearDown()
     async def request(self,path,uid,body=None,start=''):

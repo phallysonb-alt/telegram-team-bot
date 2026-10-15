@@ -84,18 +84,22 @@ def checks_for(root,args):
         changed=text(git(root,'diff','--cached','--name-only',*(['HEAD'] if head(root) else []))).splitlines()
         if not changed or any(not x.endswith('.md') for x in changed):raise GuardError('docs配置仅适用于纯Markdown修改')
         return [[sys.executable,'scripts/github_sync.py','check-docs'],[sys.executable,'-m','unittest','discover','-s','tests','-p','test_github_sync.py','-q']]
-    node=shutil.which('node')
-    if not node:
-        candidate=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe'
-        if candidate.exists():node=str(candidate)
-    if not node:raise GuardError('缺少Node.js，无法完成前端测试')
-    return [[sys.executable,'-m','team_bot','test'],[node,'--test','tests/test_miniapp_people_front.mjs','tests/test_miniapp_edge.mjs'],[sys.executable,'-m','unittest','discover','-s','migration','-p','test_migration_tools.py','-q']]
+    return [['{python}','-m','team_bot','test'],['{node}','--test','tests/test_miniapp_people_front.mjs','tests/test_miniapp_edge.mjs'],['{python}','-m','unittest','discover','-s','migration','-p','test_migration_tools.py','-q']]
+
+def node_executable():
+    found=shutil.which('node')
+    if found:return found
+    candidate=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe'
+    if candidate.is_file():return str(candidate)
+    raise GuardError('缺少Node.js，无法完成前端测试')
 
 def run_checks(root,checks):
     results=[];folder=gitdir(root)/'sync-test-logs';folder.mkdir(exist_ok=True)
     for i,argv in enumerate(checks):
-        actual=[sys.executable if a=='{python}' else a for a in argv]
-        scan_blob('README.md',json.dumps(argv).encode(),policy(root),known_values(root))
+        # Receipts/commit messages use portable names, never local account paths.
+        recorded=['{python}' if a==sys.executable else a for a in argv]
+        scan_blob('README.md',json.dumps(recorded).encode(),policy(root),known_values(root))
+        actual=[sys.executable if a=='{python}' else node_executable() if a=='{node}' else a for a in recorded]
         print('运行相关检查 '+str(i+1)+'/'+str(len(checks)),flush=True)
         try:p=subprocess.run(actual,cwd=root,capture_output=True,timeout=900)
         except (OSError,subprocess.TimeoutExpired):raise GuardError('检查无法执行或超时；未创建提交')
@@ -103,7 +107,7 @@ def run_checks(root,checks):
         # Local test evidence stays in .git. Redact known credentials even on errors.
         for value in known_values(root):raw=raw.replace(value,b'[REDACTED]')
         (folder/('latest-'+str(i+1)+'.txt')).write_bytes(raw)
-        results.append(dict(command=['{python}' if a==sys.executable else a for a in argv],exit_code=p.returncode))
+        results.append(dict(command=recorded,exit_code=p.returncode))
         if p.returncode:raise GuardError('相关检查失败；详情在.git/sync-test-logs，未提交未推送')
     return results
 

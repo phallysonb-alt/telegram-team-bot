@@ -14,7 +14,7 @@ GitHub原生不会因为复制了AGENTS.md而自动执行脚本。每次Codex开
 
 ## 新电脑与其他公司
 
-从私有仓库克隆需要仓库所有者授予读取权限；当前不会擅自给其他账号开放。安装Python3.12+与Node.js20+，运行install.cmd；配置本公司.env及真实群/话题ID后按README启动。依赖版本锁定在requirements.lock.txt，V2格式模板在templates，主库及进度库结构由原程序初始化/迁移，Cloudflare/D1通用SQL与Worker源码在deploy。
+从私有仓库克隆需要仓库所有者授予读取权限；当前不会擅自给其他账号开放。安装Python3.12+与Node.js22+，运行install.cmd；配置本公司.env及真实群/话题ID后按README启动。依赖版本锁定在requirements.lock.txt，V2格式模板在templates，主库及进度库结构由原程序初始化/迁移，Cloudflare/D1通用SQL与Worker源码在deploy。
 
 克隆后运行 `sync-github.cmd install-hooks` 启用本地提交/推送检查；Git不会自动复制执行本地钩子配置。若已有其他钩子路径，脚本拒绝覆盖。当前电脑已安装检查。身份凭据使用GitHub CLI和Windows凭据管理器，不把Token写入远程URL、脚本或仓库。
 

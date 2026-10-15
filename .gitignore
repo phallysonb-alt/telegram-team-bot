@@ -5,6 +5,7 @@
 !/.env.example
 !/AGENTS.md
 !/README.md
+!/SECURITY.md
 !/requirements*.txt
 !/*.cmd
 !/repo-policy.json
@@ -48,6 +49,8 @@
 !/docs/GitHub托管与自动同步.md
 !/docs/版本验证记录.md
 !/docs/迁移工具说明.md
+!/docs/开源前审计与发布.md
+!/docs/许可证建议.md
 !/samples/
 /samples/*
 !/samples/员工导入模板.csv
@@ -79,6 +82,7 @@
 **/temp/
 **/screenshots/
 **/.aws/
+**/.ssh/
 *.pyc
 *.pyo
 *.log

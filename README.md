@@ -1,5 +1,9 @@
 # Telegram 团队机器人｜最终整合版
 
+供各团队独立部署的 Windows Telegram 机器人与工作进度 Mini App。包含日报、阶段任务、人员管理、审计、备份和两套独立 Excel 导出。各家公司自行管理机器人、HTTPS 服务、员工群、凭据和数据库；程序不提供公共业务数据服务。
+
+**开源准备中：仓库尚未获准公开，许可证尚未授予。** 建议采用 MIT，须由权利人最终确认后加入正式 LICENSE。第三方依赖不受本项目未来许可证替代，详见 [许可证与依赖说明](docs/许可证建议.md)。公开前必须完成 [发布安全检查](docs/开源前审计与发布.md)，不能仅凭最新文件扫描通过就改为 Public。
+
 GitHub版本维护已接入：后续Codex修改、通过相关测试后，使用 `sync-github.cmd sync --message "修改说明"` 自动提交并推送私有仓库。新电脑克隆后先运行 `sync-github.cmd install-hooks`。保密、离线补推和冲突规则见 [GitHub托管与自动同步](docs/GitHub托管与自动同步.md)。
 
 可选的桌面两份历史 Excel 自动同步已接入。目录按本公司配置，默认关闭，保留原始导出文件及格式；占用重试与重启补齐见 [桌面历史表自动同步](docs/桌面历史表自动同步.md)。
@@ -11,7 +15,11 @@ GitHub版本维护已接入：后续Codex修改、通过相关测试后，使用
 继续使用现有数字身份、数据库、审计与备份。日报冻结；工作进度独立保存。管理群静默，培训暂缓，不调用 Gemini。验收与正式业务数据库分开，不转换模拟记录。
 
 ## 安装与运行
-需要 Python 3.12+。运行 install.cmd 安装锁定依赖及本地测试；复制 .env.example 为 .env，用 configure.cmd 配置自己的机器人、所有者、群与两个实际话题 ID。密钥只留本地。运行 start.cmd，stop.cmd 停止已核实的进程树。diagnose.cmd 为本地诊断；backup.cmd 创建私密备份。
+需要 Python 3.12+；部署 Mini App 云端及执行前端测试需要 Node.js 22+。运行 install.cmd 安装锁定依赖及本地测试；复制 .env.example 为 .env，用 configure.cmd 配置自己的机器人、所有者、群与两个实际话题 ID。密钥只留本地。运行 start.cmd，stop.cmd 停止已核实的进程树。diagnose.cmd 为本地诊断；backup.cmd 创建私密备份。
+
+新部署顺序：安装运行环境 → 安装依赖和测试 → 配置本公司 `.env` → 初始化本公司空库 → 配置自己的固定 HTTPS/Mini App → 验收权限及路由 → 单实例启动。完整命令及恢复步骤见 [独立部署](docs/独立公司部署与恢复.md)。不要拿他人公司的私有备份作为初始数据；不要把示例模板中的模拟员工导入业务库。
+
+仓库不分发 Python/Node 运行环境或可选专有制表库。未安装可选 `@oai/artifact-tool` 时，使用项目已有 openpyxl 兼容路径；无需登录 ChatGPT 或使用 Codex 才能运行。部署依赖使用 `deploy/package-lock.json` 与 `npm ci`，不在服务器上任意升级版本。
 
 每个项目目录使用一个 polling 实例；实例锁阻止重复启动。不要另开 getUpdates。Windows 登录自启用 autostart-install.cmd，取消用 autostart-uninstall.cmd。stop.cmd 会留下人工停止标记，避免守护程序重新启动。后台网络中断自动重连；电脑关机或休眠时本地服务停止，云端页面会显示离线，业务不能保存。
 
@@ -48,3 +56,13 @@ test.cmd 或 python -m team_bot test 运行去重后的当前门禁；旧数量�
 核心：member_registry.py/onboarding.py（统一数字身份与重试）；progress_rounds.py/progress_lock.py（轮次、累计锁定、增量、迁移）；progress_miniapp.py（签名、权限、保存、幂等）；miniapp/app.js（表单与展示）；miniapp_fast_bridge.py/deploy/worker.js（持久中转、恢复）；progress_messages.py（转义 HTML 群消息）；progress_history_v2.py/progress_export.py（历史投影与安全更新）。daily.py/daily_history.py/daily_names.py/scheduler.py 业务源码保持冻结。
 
 独立部署见 [部署与恢复](docs/独立公司部署与恢复.md)，代码托管验证见 [版本验证记录](docs/版本验证记录.md)。公司实际联调记录保留本地，不上传。仓库不含密钥、实值配置、业务库、日志、真实培训内容或运行环境。
+
+## 安全维护
+
+漏洞和泄露报告方式见 [安全政策](SECURITY.md)。每次提交扫描暂存文件，每次推送复核新增提交及提交信息；模板按审核过的 SHA256 放行。新电脑必须安装仓库钩子。对所有本地 Git 对象进行只读检查：
+
+```powershell
+python scripts/publication_audit.py --output ../private-audit/git-history.json
+```
+
+发现历史风险时保留私有状态。删除工作区文件、加入 `.gitignore` 或新增安全提交都不会移除旧历史。GitHub 发布附件、Actions 日志/工件及平台缓存需要另行核查。审计报告及完整 Git 备份保存在仓库外，不作为公开 Release 附件。

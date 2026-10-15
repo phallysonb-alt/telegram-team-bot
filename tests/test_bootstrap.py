@@ -80,7 +80,7 @@ class BootstrapAndIsolationTests(Base, unittest.IsolatedAsyncioTestCase):
         await a.handle(self.make_update(1, '/whereami', chat=private), ctx)
         await a.handle(self.make_update(2, '/register Y001', chat=private), ctx)
         group = dict(id=-100321, type='supergroup', title='测试群', is_forum=True)
-        await a.handle(self.make_update(3, '/whereami@csg6gbot', chat=group, thread=44), ctx)
+        await a.handle(self.make_update(3, '/whereami@example_team_bot', chat=group, thread=44), ctx)
         self.assertEqual(self.s.db.all('SELECT * FROM employees'), [])
         self.assertFalse(self.s.admin(10001))
         self.assertEqual(self.c.owner, 0)

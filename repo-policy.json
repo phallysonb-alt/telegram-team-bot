@@ -51,7 +51,10 @@
     "start.cmd",
     "stop.cmd",
     "sync-github.cmd",
-    "test.cmd"
+    "test.cmd",
+    "SECURITY.md",
+    "docs/开源前审计与发布.md",
+    "docs/许可证建议.md"
   ],
   "templates": {
     "templates/Telegram_Progress_History_Template_v2.xlsx": "2408e8d2658c877c9dd5b65c910e4970c1b284e425d85bf48560afd6996af967",
