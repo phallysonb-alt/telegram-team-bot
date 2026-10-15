@@ -2,9 +2,11 @@
 
 供各团队独立部署的 Windows Telegram 机器人与工作进度 Mini App。包含日报、阶段任务、人员管理、审计、备份和两套独立 Excel 导出。各家公司自行管理机器人、HTTPS 服务、员工群、凭据和数据库；程序不提供公共业务数据服务。
 
-**开源准备中：仓库尚未获准公开，许可证尚未授予。** 建议采用 MIT，须由权利人最终确认后加入正式 LICENSE。第三方依赖不受本项目未来许可证替代，详见 [许可证与依赖说明](docs/许可证建议.md)。公开前必须完成 [发布安全检查](docs/开源前审计与发布.md)，不能仅凭最新文件扫描通过就改为 Public。
+本项目采用 [MIT许可证](LICENSE)，允许下载、修改和独立部署。第三方依赖保留各自许可证，详见 [许可证与依赖说明](docs/许可证建议.md)。各公司的密钥、身份库与业务历史不属于公开分发内容。
 
-GitHub版本维护已接入：后续Codex修改、通过相关测试后，使用 `sync-github.cmd sync --message "修改说明"` 自动提交并推送私有仓库。新电脑克隆后先运行 `sync-github.cmd install-hooks`。保密、离线补推和冲突规则见 [GitHub托管与自动同步](docs/GitHub托管与自动同步.md)。
+下载：[源码ZIP](https://github.com/phallysonb-alt/telegram-team-bot/archive/refs/heads/main.zip)；或运行 `git clone https://github.com/phallysonb-alt/telegram-team-bot.git`。安装前阅读下方运行环境和独立部署说明。
+
+GitHub版本维护已接入：后续Codex修改、通过相关测试后，使用 `sync-github.cmd sync --message "修改说明"` 自动提交并推送已授权仓库。新电脑克隆后先运行 `sync-github.cmd install-hooks`。保密、离线补推和冲突规则见 [GitHub托管与自动同步](docs/GitHub托管与自动同步.md)。
 
 可选的桌面两份历史 Excel 自动同步已接入。目录按本公司配置，默认关闭，保留原始导出文件及格式；占用重试与重启补齐见 [桌面历史表自动同步](docs/桌面历史表自动同步.md)。
 
@@ -66,3 +68,7 @@ python scripts/publication_audit.py --output ../private-audit/git-history.json
 ```
 
 发现历史风险时保留私有状态。删除工作区文件、加入 `.gitignore` 或新增安全提交都不会移除旧历史。GitHub 发布附件、Actions 日志/工件及平台缓存需要另行核查。审计报告及完整 Git 备份保存在仓库外，不作为公开 Release 附件。
+
+## 外部贡献
+
+可通过fork或PR提出建议，不会自动合并。公众不获得本仓库直接推送权限。勿在Issue、PR或附件中上传公司凭据、员工资料、业务Excel或日志；部署和维护自己的副本时，使用自己合法取得的配置与数据。

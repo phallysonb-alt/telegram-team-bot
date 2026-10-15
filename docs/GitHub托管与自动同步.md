@@ -4,7 +4,7 @@
 
 ## 开发任务收尾
 
-用户已授权后续Codex完成修改及相关测试后自动提交、推送到本项目私有origin。根目录AGENTS.md记录长期规则，无需用户逐次重复授权。使用 `sync-github.cmd sync --message "具体修改内容"`；默认运行现行Python回归及两组JS测试。纯Markdown修改可以加 `--profile docs`，运行文档检查与同步工具回归。指定相关测试时，`--checks-json 文件路径` 接受非空命令argv数组，例如 `[["{python}","-m","unittest","discover","-s","tests","-p","test_desktop_sync.py"]]`。不得用无关检查掩盖业务改动。
+用户已授权后续Codex完成修改及相关测试后自动提交、推送到本项目已授权origin（可公开）。根目录AGENTS.md记录长期规则，无需用户逐次重复授权。使用 `sync-github.cmd sync --message "具体修改内容"`；默认运行现行Python回归及两组JS测试。纯Markdown修改可以加 `--profile docs`，运行文档检查与同步工具回归。指定相关测试时，`--checks-json 文件路径` 接受非空命令argv数组，例如 `[["{python}","-m","unittest","discover","-s","tests","-p","test_desktop_sync.py"]]`。不得用无关检查掩盖业务改动。
 
 程序先扫描工作区，再暂存可提交文件；测试通过后把结果与准确Git暂存树绑定，在.git内保存凭证。源码测试中途改变、缺少测试、扫描失败都会停止。提交说明包含测试命令、结果与对应树版本。测试证据和同步状态不包含在仓库内。
 
@@ -14,7 +14,7 @@ GitHub原生不会因为复制了AGENTS.md而自动执行脚本。每次Codex开
 
 ## 新电脑与其他公司
 
-从私有仓库克隆需要仓库所有者授予读取权限；当前不会擅自给其他账号开放。安装Python3.12+与Node.js22+，运行install.cmd；配置本公司.env及真实群/话题ID后按README启动。依赖版本锁定在requirements.lock.txt，V2格式模板在templates，主库及进度库结构由原程序初始化/迁移，Cloudflare/D1通用SQL与Worker源码在deploy。
+本仓库公开后任何人可克隆、下载并独立部署，但不获得上游写权限。安装Python3.12+与Node.js22+，运行install.cmd；配置本公司.env及真实群/话题ID后按README启动。依赖版本锁定在requirements.lock.txt，V2格式模板在templates，主库及进度库结构由原程序初始化/迁移，Cloudflare/D1通用SQL与Worker源码在deploy。
 
 克隆后运行 `sync-github.cmd install-hooks` 启用本地提交/推送检查；Git不会自动复制执行本地钩子配置。若已有其他钩子路径，脚本拒绝覆盖。当前电脑已安装检查。身份凭据使用GitHub CLI和Windows凭据管理器，不把Token写入远程URL、脚本或仓库。
 
@@ -24,6 +24,12 @@ GitHub原生不会因为复制了AGENTS.md而自动执行脚本。每次Codex开
 
 .gitignore默认只允许源码、通用部署文件及审核文档；repo-policy.json提供独立路径检查。暂存扫描与推送历史扫描同时运行，拒绝业务目录、数据库、实际Excel、日志、备份、私钥、实值Cloudflare配置、可疑凭据模式及本地.env中的已知敏感值。模板仅允许已审核的准确SHA256；更换模板必须先确认仍是格式参考/模拟数据，再更新审核值。
 
-输出只给文件路径和规则，不打印命中的秘密。推送前再次核实远端是私有仓库；如果私有性、权限或网络无法核实，保留本地提交并停止推送。
+输出只给文件路径和规则，不打印命中的秘密。推送前核实远端与 repo-policy.json 的 github_sync.repository 完全一致，公开仓库还必须 allow_public=true，当前账户须有已核实推送权限。目标不符、未授权公开、无写权限或网络无法核实时，保留本地提交并停止推送。
 
 本地规则不能识别所有可能的敏感内容，也不能防止有意绕过钩子。Codex必须保留人工差异审阅，禁止--no-verify及伪造测试凭证。未跟踪的本地实值文件不能被强行加入仓库。
+
+## 公开仓库同步与贡献
+
+用户已授权现有仓库以MIT公开，旧历史中已核实的非密钥机器人公开标识及本机路径按用户决定保留，不重写历史。该决定不允许未来提交任何秘密或业务数据。克隆/fork者部署时必须使用自己的Bot、群、数据库和云端配置。
+
+上游仍由所有者管理；外部贡献经fork/PR提出，不自动合并，不自动执行未审查贡献，不授予公众推送权限。希望维护自己的fork时，先在自己的副本中调整origin和github_sync授权仓库，审查后提交；不能用修改配置绕过上游权限。公开仓库的日常同步仍执行相同扫描、测试、凭证与安全补推，禁止强推、删除分支及覆盖远端历史。

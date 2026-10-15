@@ -13,7 +13,7 @@ class GitHubSyncTests(unittest.TestCase):
   # Clear inherited hook variables before testing an independent local repository.
   self.env=patch.dict(os.environ,{'GIT_CONFIG_COUNT':'0'});self.env.start()
   self.g('init','-b','main');self.g('config','user.name','Mock Company');self.g('config','user.email','mock@example.invalid')
-  self.pol=dict(files=['README.md','AGENTS.md','repo-policy.json','.gitignore','docs/GitHub托管与自动同步.md','docs/note.md'],templates={},source_roots={'scripts/':['.py'],'tests/':['.py']})
+  self.pol=dict(files=['README.md','AGENTS.md','repo-policy.json','.gitignore','docs/GitHub托管与自动同步.md','docs/note.md'],templates={},source_roots={'scripts/':['.py'],'tests/':['.py']},github_sync=dict(repository='mock/repo',allow_public=False))
   self.write('repo-policy.json',json.dumps(self.pol));self.write('README.md','Mock source\n');self.write('AGENTS.md','Isolated fixture\n');self.write('docs/GitHub托管与自动同步.md','Mock guide\n');self.write('.gitignore','.env\ndata/\n')
  def tearDown(self):self.env.stop();self.temp.cleanup()
  def g(self,*a,check=True):return guard.git(self.root,*a,check=check)
@@ -68,10 +68,22 @@ class GitHubSyncTests(unittest.TestCase):
   self.g('remote','add','origin','https://github.com/mock/repo.git')
   actual_run=subprocess.run
   def public_reply(argv,**kwargs):
-   if argv[0]=='gh':return SimpleNamespace(returncode=0,stdout=b'{"isPrivate":false,"nameWithOwner":"mock/repo"}')
+   if argv[0]=='gh':return SimpleNamespace(returncode=0,stdout=b'{"isPrivate":false,"nameWithOwner":"mock/repo","viewerPermission":"ADMIN"}')
    return actual_run(argv,**kwargs)
   with patch.object(sync,'gh_executable',return_value='gh'),patch.object(sync.subprocess,'run',side_effect=public_reply):
-   with self.assertRaises(guard.GuardError):sync.private_remote(self.root)
+   with self.assertRaises(guard.GuardError):sync.authorized_remote(self.root)
+   self.pol['github_sync']['allow_public']=True;self.write('repo-policy.json',json.dumps(self.pol))
+   self.assertEqual(sync.authorized_remote(self.root),'mock/repo')
+ def test_authorized_remote_rejects_unknown_repository_and_readonly(self):
+  self.g('remote','add','origin','https://github.com/other/repo.git')
+  with self.assertRaises(guard.GuardError):sync.authorized_remote(self.root)
+  self.g('remote','set-url','origin','https://github.com/mock/repo.git');actual_run=subprocess.run
+  def readonly_reply(argv,**kwargs):
+   if argv[0]=='gh':return SimpleNamespace(returncode=0,stdout=b'{"isPrivate":false,"nameWithOwner":"mock/repo","viewerPermission":"READ"}')
+   return actual_run(argv,**kwargs)
+  self.pol['github_sync']['allow_public']=True;self.write('repo-policy.json',json.dumps(self.pol))
+  with patch.object(sync,'gh_executable',return_value='gh'),patch.object(sync.subprocess,'run',side_effect=readonly_reply):
+   with self.assertRaises(guard.GuardError):sync.authorized_remote(self.root)
  def test_docs_profile_cannot_hide_source_changes(self):
   self.commit();self.write('scripts/new.py','print(1)');self.g('add','--all')
   with self.assertRaises(guard.GuardError):sync.checks_for(self.root,SimpleNamespace(profile='docs',checks_json=None))
@@ -81,19 +93,19 @@ class GitHubSyncTests(unittest.TestCase):
   with self.assertRaises(guard.GuardError):sync.validate_outgoing(self.root,[bad])
  def test_commit_remains_after_offline_push_and_safe_retry(self):
   self.commit();self.g('remote','add','origin',str(Path(self.temp.name)/'missing.git'));before=sync.head(self.root)
-  with patch.object(sync,'private_remote',return_value='mock/repo'):
+  with patch.object(sync,'authorized_remote',return_value='mock/repo'):
    with self.assertRaises(guard.GuardError):sync.push(self.root)
   self.assertEqual(before,sync.head(self.root))
   bare=Path(self.temp.name)/'bare.git';subprocess.run(['git','init','--bare',str(bare)],capture_output=True,check=True);self.g('remote','set-url','origin',str(bare))
-  with patch.object(sync,'private_remote',return_value='mock/repo'):sync.push(self.root)
+  with patch.object(sync,'authorized_remote',return_value='mock/repo'):sync.push(self.root)
   self.assertEqual(sync.text(self.g('ls-remote','origin','refs/heads/main')).split()[0],before)
  def test_remote_other_changes_never_force_overwritten(self):
   self.commit();bare=Path(self.temp.name)/'bare.git';subprocess.run(['git','init','--bare',str(bare)],capture_output=True,check=True);self.g('remote','add','origin',str(bare))
-  with patch.object(sync,'private_remote',return_value='mock/repo'):sync.push(self.root)
+  with patch.object(sync,'authorized_remote',return_value='mock/repo'):sync.push(self.root)
   other=Path(self.temp.name)/'other';subprocess.run(['git','clone','-b','main',str(bare),str(other)],capture_output=True,check=True)
   guard.git(other,'config','user.name','Other Mock');guard.git(other,'config','user.email','other@example.invalid');(other/'README.md').write_text('remote changed');guard.git(other,'add','--all');guard.git(other,'commit','-m','other');guard.git(other,'push','origin','main')
   remote_before=sync.text(guard.git(other,'rev-parse','HEAD'));self.write('README.md','local changed');self.commit()
-  with patch.object(sync,'private_remote',return_value='mock/repo'):
+  with patch.object(sync,'authorized_remote',return_value='mock/repo'):
    with self.assertRaisesRegex(guard.GuardError,'其他修改'):sync.push(self.root)
   self.assertEqual(sync.text(self.g('ls-remote','origin','refs/heads/main')).split()[0],remote_before)
 

@@ -6,6 +6,7 @@
 !/AGENTS.md
 !/README.md
 !/SECURITY.md
+!/LICENSE
 !/requirements*.txt
 !/*.cmd
 !/repo-policy.json

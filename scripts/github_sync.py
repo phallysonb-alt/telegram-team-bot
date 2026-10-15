@@ -43,14 +43,18 @@ def repo_slug(url):
     if len(slug.split('/'))!=2 or any(not s or not all(c.isalnum() or c in '-_.' for c in s) for s in slug.split('/')):raise GuardError('origin仓库地址无效')
     return slug
 
-def private_remote(root):
+def authorized_remote(root):
     fetch=text(git(root,'remote','get-url','origin'));slug=repo_slug(fetch)
+    rule=policy(root).get('github_sync',{})
+    if rule.get('repository','').lower()!=slug.lower():raise GuardError('origin与已授权仓库不符；拒绝向其他仓库同步')
     push_urls=text(git(root,'remote','get-url','--push','--all','origin')).splitlines()
     if not push_urls or any(repo_slug(u)!=slug for u in push_urls):raise GuardError('推送地址与origin不同，需先检查')
-    p=subprocess.run([gh_executable(),'repo','view',slug,'--json','nameWithOwner,isPrivate'],capture_output=True)
+    p=subprocess.run([gh_executable(),'repo','view',slug,'--json','nameWithOwner,isPrivate,viewerPermission'],capture_output=True)
     if p.returncode:raise GuardError('GitHub暂不可访问或无仓库权限；本地提交保留')
     data=json.loads(p.stdout)
-    if not data.get('isPrivate') or data.get('nameWithOwner','').lower()!=slug.lower():raise GuardError('目标仓库不是已核实的私有仓库')
+    if data.get('nameWithOwner','').lower()!=slug.lower() or not isinstance(data.get('isPrivate'),bool):raise GuardError('目标仓库身份或可见性无法核实')
+    if not data['isPrivate'] and rule.get('allow_public') is not True:raise GuardError('目标为公开仓库，但尚未获得公开同步授权')
+    if data.get('viewerPermission') not in ('ADMIN','MAINTAIN','WRITE'):raise GuardError('当前GitHub账户没有已核实的推送权限')
     return slug
 
 def ahead_commits(root):
@@ -63,7 +67,7 @@ def validate_outgoing(root,commits):
         scan_blob('README.md',git(root,'log','-1','--format=%B',commit).stdout,policy(root),known_values(root))
 
 def push(root):
-    private_remote(root)
+    authorized_remote(root)
     branch=text(git(root,'symbolic-ref','--short','HEAD'))
     if git(root,'fetch','origin','--prune',check=False).returncode:raise GuardError('网络或远程读取失败；本地提交已保留，稍后retry')
     remote='refs/remotes/origin/'+branch
@@ -151,7 +155,7 @@ def main():
         print('本地版本：'+(head(root) or '尚未提交'));print('未同步本地提交：'+str(len(ahead_commits(root)) if head(root) else 0));print('工作区变更数：'+str(len(text(git(root,'status','--porcelain')).splitlines())))
     elif args.action=='hook-commit':scan(root);require_receipt(root,tree(root))
     elif args.action=='hook-push':
-        slug=private_remote(root);commits=[]
+        slug=authorized_remote(root);commits=[]
         if args.remote_name!='origin' or not args.remote_url or repo_slug(args.remote_url)!=slug:raise GuardError('拒绝向未授权的其他远程推送')
         for line in sys.stdin:
             local_ref,local_oid,remote_ref,remote_oid=line.split()
