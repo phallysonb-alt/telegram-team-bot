@@ -1,0 +1,9 @@
+python-telegram-bot==22.8
+google-genai==2.29.0
+python-dotenv==1.2.4
+python-docx==1.2.0
+pypdf==6.20.0
+tzdata==2026.5
+
+websockets==16.1.1
+openpyxl==3.1.5

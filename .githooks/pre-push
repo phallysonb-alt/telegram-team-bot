@@ -1,0 +1,10 @@
+#!/bin/sh
+root=$(git rev-parse --show-toplevel) || exit 1
+if [ -x "$root/.venv/Scripts/python.exe" ]; then
+  py="$root/.venv/Scripts/python.exe"
+elif [ -x "$root/.venv/bin/python" ]; then
+  py="$root/.venv/bin/python"
+else
+  py=python
+fi
+exec "$py" "$root/scripts/github_sync.py" hook-push --remote-name "$1" --remote-url "$2"

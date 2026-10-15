@@ -1,0 +1,1 @@
+先运行install.cmd安装，不会启动。inspect只检查私有备份。restore与activate仅在另行授权停止旧电脑和切换后使用。详见docs/迁移工具说明.md：本仓库保留当前标准启动脚本，HANDOVER_PENDING是迁移待核验记录，不是标准start.cmd的自动拦截条件。不要把本次Git托管授权当作停机、恢复或切换授权。

@@ -1,0 +1,83 @@
+{
+  "files": [
+    ".env.example",
+    ".gitattributes",
+    ".githooks/pre-commit",
+    ".githooks/pre-push",
+    ".gitignore",
+    "AGENTS.md",
+    "README.md",
+    "autostart-install.cmd",
+    "autostart-uninstall.cmd",
+    "backup.cmd",
+    "configure.cmd",
+    "demo.cmd",
+    "deploy/0000_miniapp_bridge.sql",
+    "deploy/build-worker.mjs",
+    "deploy/build_site.py",
+    "deploy/package-lock.json",
+    "deploy/package.json",
+    "deploy/worker.js",
+    "deploy/wrangler.toml.example",
+    "diagnose.cmd",
+    "docs/GitHub托管与自动同步.md",
+    "docs/V2格式与群消息排版修正.md",
+    "docs/三色进度与历史问题.md",
+    "docs/员工说明.md",
+    "docs/导出入口说明.md",
+    "docs/日报查询与Excel说明.md",
+    "docs/桌面历史表自动同步.md",
+    "docs/版本验证记录.md",
+    "docs/独立公司部署与恢复.md",
+    "docs/管理员说明.md",
+    "docs/跨轮累计总表修复.md",
+    "docs/迁移工具说明.md",
+    "install.cmd",
+    "migration/README.md",
+    "repo-policy.json",
+    "requirements.lock.txt",
+    "requirements.txt",
+    "restore.cmd",
+    "samples/协同工作台模拟展示.html",
+    "samples/历史样例/日报模板-v1.txt",
+    "samples/历史样例/说明.md",
+    "samples/历史样例/进度模板-v1.txt",
+    "samples/员工导入模板.csv",
+    "samples/固定数据期望.json",
+    "samples/培训资料样例.md",
+    "samples/日报模板.txt",
+    "samples/独立模拟目录资料.txt",
+    "samples/预置人员编号.csv",
+    "start.cmd",
+    "stop.cmd",
+    "sync-github.cmd",
+    "test.cmd"
+  ],
+  "templates": {
+    "templates/Telegram_Progress_History_Template_v2.xlsx": "2408e8d2658c877c9dd5b65c910e4970c1b284e425d85bf48560afd6996af967",
+    "templates/日报历史记录_空白格式模板.xlsx": "7c27139f1d3daf49765a410ac12846cb99a850c57d529f389fe950b7a386f6be"
+  },
+  "source_roots": {
+    "team_bot/": [
+      ".py"
+    ],
+    "miniapp/": [
+      ".html",
+      ".js",
+      ".css"
+    ],
+    "scripts/": [
+      ".py",
+      ".ps1",
+      ".mjs",
+      ".json"
+    ],
+    "tests/": [
+      ".py",
+      ".mjs"
+    ],
+    "migration/": [
+      ".py"
+    ]
+  }
+}

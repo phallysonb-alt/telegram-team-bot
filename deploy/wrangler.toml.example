@@ -1,0 +1,13 @@
+name = "company-work-progress"
+main = "dist/worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+PROGRESS_BOT_ID = "REPLACE_WITH_YOUR_BOT_NUMERIC_ID"
+BOOTSTRAP_ALLOWED = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "company-progress-relay"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
