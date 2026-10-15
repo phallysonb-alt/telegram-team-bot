@@ -15,6 +15,8 @@ GitHub版本维护已接入：后续Codex修改、通过相关测试后，使用
 
 每个项目目录使用一个 polling 实例；实例锁阻止重复启动。不要另开 getUpdates。Windows 登录自启用 autostart-install.cmd，取消用 autostart-uninstall.cmd。stop.cmd 会留下人工停止标记，避免守护程序重新启动。后台网络中断自动重连；电脑关机或休眠时本地服务停止，云端页面会显示离线，业务不能保存。
 
+登录自启使用 pythonw 无控制台入口；守护脚本、启动辅助程序和后台解释器均避免创建额外终端。已有 python.exe 机器人仍能正确识别，不因更新脚本而重复启动。详见[Windows 启动与恢复](docs/独立公司部署与恢复.md#windows-无控制台启动)。
+
 默认 RUN_MODE=trial、SCHEDULE_ENABLED=false、AI_ENABLED=false。正式调度需要另行授权；当前工作日配置仍待确认，不能自行启用。验收记录不会自动转成正式业务。
 
 ## 人员与工作进度

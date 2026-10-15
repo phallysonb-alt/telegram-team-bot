@@ -6,8 +6,10 @@ if ($Mode -eq 'uninstall') {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Write-Host '已卸载登录自启动。'
 } else {
-    $StartPath = Join-Path $PSScriptRoot 'login-watch.ps1'
-    $Action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$StartPath`"" -WorkingDirectory $ProjectRoot
+    $PythonWindowless = Join-Path $ProjectRoot '.venv\Scripts\pythonw.exe'
+    if (-not (Test-Path -LiteralPath $PythonWindowless)) { throw '请先运行 install.cmd 安装依赖。' }
+    $StartPath = Join-Path $PSScriptRoot 'windows_background.py'
+    $Action = New-ScheduledTaskAction -Execute $PythonWindowless -Argument "`"$StartPath`" monitor" -WorkingDirectory $ProjectRoot
     $Trigger = New-ScheduledTaskTrigger -AtLogOn -User ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
     $Settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
     $Principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited

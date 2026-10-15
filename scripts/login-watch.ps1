@@ -1,5 +1,5 @@
 . "$PSScriptRoot\common.ps1"
-$DataPath = (& $PythonExe -m team_bot paths | Select-Object -Last 1)
+$DataPath = (Invoke-WindowlessPython -PythonArgs @('-m','team_bot','paths') | Select-Object -Last 1)
 if ($LASTEXITCODE -ne 0) { exit 1 }
 $StopPath = Join-Path $DataPath 'autostart.stop'
 $PidPath = Join-Path $DataPath 'process.pid'
@@ -10,11 +10,13 @@ while (-not (Test-Path -LiteralPath $StopPath)) {
         $SavedBotId = 0
         if ([int]::TryParse((Get-Content -LiteralPath $PidPath | Select-Object -First 1), [ref]$SavedBotId)) {
             $Process = Get-CimInstance Win32_Process -Filter "ProcessId=$SavedBotId" -ErrorAction SilentlyContinue
-            $Running = $Process -and $Process.ExecutablePath -eq $PythonExe -and $Process.CommandLine -like '*team_bot run*'
+            $Running = Test-BotProcess $Process
         }
     }
     if (-not $Running) {
-        & powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PSScriptRoot\start.ps1" *> $null
+        # Run within this console-free watcher, rather than creating another shell.
+        # A failed recovery must not terminate the 30-second retry loop.
+        try { & "$PSScriptRoot\start.ps1" *> $null } catch { }
     }
     Start-Sleep -Seconds 30
 }

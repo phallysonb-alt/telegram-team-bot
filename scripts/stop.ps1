@@ -1,5 +1,5 @@
 ﻿. "$PSScriptRoot\common.ps1"
-$DataPath = (& $PythonExe -m team_bot paths | Select-Object -Last 1)
+$DataPath = (Invoke-WindowlessPython -PythonArgs @('-m','team_bot','paths') | Select-Object -Last 1)
 New-Item -ItemType Directory -Path $DataPath -Force | Out-Null
 'manual stop' | Set-Content -LiteralPath (Join-Path $DataPath 'autostart.stop')
 $PidPath = Join-Path $DataPath 'process.pid'
@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $PidPath)) { Write-Host '未发现运行进程�
 $BotPid = [int](Get-Content -LiteralPath $PidPath)
 $BotProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$BotPid"
 if ($BotProcess) {
-    if ($BotProcess.ExecutablePath -ne $PythonExe -or $BotProcess.CommandLine -notlike '*team_bot run*') { throw '此编号属于其他进程，无法停止，请核对。' }
+    if (-not (Test-BotProcess $BotProcess)) { throw '此编号属于其他进程，无法停止，请核对。' }
     # Windows venv launcher may have a Python interpreter child. Stop only this verified process tree.
     $AllProcesses = @(Get-CimInstance Win32_Process)
     $Descendants = @()
