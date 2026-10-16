@@ -6,6 +6,7 @@ from concurrent.futures import TimeoutError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
+from .bridge_diagnostics import MemberCheckUnavailable
 
 ROOT=Path(__file__).resolve().parents[1]/'miniapp'
 
@@ -38,6 +39,7 @@ def start_server(api,loop,host='127.0.0.1',port=8765):
                 envelope=json.loads(self.rfile.read(length))
                 future=asyncio.run_coroutine_threadsafe(api.dispatch(self.path,envelope),loop)
                 result=future.result(40);self.answer(200,result)
+            except MemberCheckUnavailable as e:self.answer(503,dict(error=str(e),code='membership_unavailable',retryable=True))
             except PermissionError as e:self.answer(403,dict(error=str(e)))
             except ValueError as e:self.answer(400,dict(error=str(e) if str(e) in ('任务已调整，请进入新的查询','顺序任务不能跳过前置步骤','请填写本次全部任务','每项备注最多3500字','这是旧轮查询，请进入最新查询反馈','该日没有所选有效任务','请求内容已变化，请重新提交') else '填写或入口无效，请检查后重试'))
             except (KeyError,TypeError):self.answer(400,dict(error='填写或入口无效，请检查后重试'))

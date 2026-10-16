@@ -87,6 +87,10 @@ class GitHubSyncTests(unittest.TestCase):
  def test_docs_profile_cannot_hide_source_changes(self):
   self.commit();self.write('scripts/new.py','print(1)');self.g('add','--all')
   with self.assertRaises(guard.GuardError):sync.checks_for(self.root,SimpleNamespace(profile='docs',checks_json=None))
+ def test_default_gate_includes_bridge_stability(self):
+  checks=sync.checks_for(self.root,SimpleNamespace(profile='default',checks_json=None))
+  self.assertTrue(any('tests/test_worker_stability.mjs' in command for command in checks))
+  self.assertIn(['{python}','-m','team_bot','test'],checks)
  def test_scan_outgoing_history_catches_removed_secret(self):
   old=self.commit();self.write('README.md','ghp_'+'A'*36);bad=self.commit();self.write('README.md','safe again');self.commit()
   guard.scan(self.root,'HEAD')

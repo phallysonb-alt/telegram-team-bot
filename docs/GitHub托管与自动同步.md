@@ -4,7 +4,7 @@
 
 ## 开发任务收尾
 
-用户已授权后续Codex完成修改及相关测试后自动提交、推送到本项目已授权origin（可公开）。根目录AGENTS.md记录长期规则，无需用户逐次重复授权。使用 `sync-github.cmd sync --message "具体修改内容"`；默认运行现行Python回归及两组JS测试。纯Markdown修改可以加 `--profile docs`，运行文档检查与同步工具回归。指定相关测试时，`--checks-json 文件路径` 接受非空命令argv数组，例如 `[["{python}","-m","unittest","discover","-s","tests","-p","test_desktop_sync.py"]]`。不得用无关检查掩盖业务改动。
+用户已授权后续Codex完成修改及相关测试后自动提交、推送到本项目已授权origin（可公开）。根目录AGENTS.md记录长期规则，无需用户逐次重复授权。使用 `sync-github.cmd sync --message "具体修改内容"`；默认运行现行Python回归、前端与桥接JS测试及迁移工具检查。纯Markdown修改可以加 `--profile docs`，运行文档检查与同步工具回归。指定相关测试时，`--checks-json 文件路径` 接受非空命令argv数组，例如 `[["{python}","-m","unittest","discover","-s","tests","-p","test_desktop_sync.py"]]`。不得用无关检查掩盖业务改动。
 
 程序先扫描工作区，再暂存可提交文件；测试通过后把结果与准确Git暂存树绑定，在.git内保存凭证。源码测试中途改变、缺少测试、扫描失败都会停止。提交说明包含测试命令、结果与对应树版本。测试证据和同步状态不包含在仓库内。
 

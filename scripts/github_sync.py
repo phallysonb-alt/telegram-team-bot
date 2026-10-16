@@ -88,7 +88,7 @@ def checks_for(root,args):
         changed=text(git(root,'diff','--cached','--name-only',*(['HEAD'] if head(root) else []))).splitlines()
         if not changed or any(not x.endswith('.md') for x in changed):raise GuardError('docs配置仅适用于纯Markdown修改')
         return [[sys.executable,'scripts/github_sync.py','check-docs'],[sys.executable,'-m','unittest','discover','-s','tests','-p','test_github_sync.py','-q']]
-    return [['{python}','-m','team_bot','test'],['{node}','--test','tests/test_miniapp_people_front.mjs','tests/test_miniapp_edge.mjs'],['{python}','-m','unittest','discover','-s','migration','-p','test_migration_tools.py','-q']]
+    return [['{python}','-m','team_bot','test'],['{node}','--test','tests/test_miniapp_people_front.mjs','tests/test_miniapp_edge.mjs','tests/test_worker_stability.mjs'],['{python}','-m','unittest','discover','-s','migration','-p','test_migration_tools.py','-q']]
 
 def node_executable():
     found=shutil.which('node')

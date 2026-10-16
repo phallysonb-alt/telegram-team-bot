@@ -1,6 +1,7 @@
 """Single numeric identity registry, reconciled only with live group membership."""
 from .db import stamp
 import asyncio,time
+from .bridge_diagnostics import MemberCheckUnavailable,emit
 
 def defer(s,uid):
     pending=s.db.setting('member_reconcile_pending',{})
@@ -24,8 +25,16 @@ async def watch(s,bot):
         await asyncio.sleep(5)
 
 async def reconcile(s,bot,uid,user=None):
+    from telegram.error import NetworkError,TimedOut,RetryAfter,BadRequest
+    started=time.perf_counter()
     try: member=await bot.get_chat_member(s.c.chat,uid)
-    except Exception: raise PermissionError('群成员核验暂时失败，请重试；尚未开通新权限') from None
+    except Exception as error:
+        # A failed bot/API lookup is not proof that this employee lacks access.
+        # Do not run apply(), change identities or allow business writes on error.
+        reason='telegram_timeout' if isinstance(error,(TimedOut,TimeoutError)) else 'telegram_rate_limited' if isinstance(error,RetryAfter) else 'telegram_network' if isinstance(error,NetworkError) and not isinstance(error,BadRequest) else 'telegram_unavailable'
+        elapsed=(time.perf_counter()-started)*1000
+        emit('membership_unavailable',reason=reason,telegram_ms=elapsed)
+        raise MemberCheckUnavailable(reason,elapsed) from None
     if member.user.id!=uid:raise PermissionError('群成员数字身份不一致')
     return apply(s,member,user)
 
