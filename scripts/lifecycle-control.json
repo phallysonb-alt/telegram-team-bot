@@ -1,0 +1,13 @@
+{
+  "protocol": 1,
+  "files": {
+    "scripts/windows_background.py": "6b8dad89054f995bb8697da78824c7726df14076a1f0000f33c0bbae09567d3b",
+    "team_bot/process_control.py": "31909d4288edbb72fb359769196c3f4cce85474d54bac5ed8aa819a6e473b502",
+    "scripts/common.ps1": "4fb3ca0d53fb167e1e4f50164b1c752728534346c0f4efb4acece99dda7aae13",
+    "scripts/start.ps1": "9f818bf24d7b656fe0bc181e159a55f865c047cc405c47bbad406e298cbfcc6f",
+    "scripts/stop.ps1": "f0e50a251118a588fdbff8ecf3e84ee4520953aec2e7b48de7b4d17e0405b7e9",
+    "scripts/login-watch.ps1": "42b0e135a7f18e9c689f632b1ccfe069a1c8bfce61113809f14621ab8ba506ce",
+    "start.cmd": "acb8b7dc50f18a80e62f784bf23a4ee788d2746274ded87a9786059bef2de2d2",
+    "stop.cmd": "3817f8d0c3193d209e1bdb74d2c4ef97fcd920787451301913e5a0f4d162ed60"
+  }
+}

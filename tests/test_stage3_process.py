@@ -30,8 +30,9 @@ class Stage3ProcessTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);self.data=self.root/'fixture data';self.data.mkdir()
         for folder in ('scripts','team_bot','.venv/Scripts'):(self.root/folder).mkdir(parents=True)
-        for name in ('windows_background.py','common.ps1','start.ps1','stop.ps1'):
+        for name in ('windows_background.py','common.ps1','start.ps1','stop.ps1','login-watch.ps1','lifecycle-control.json'):
             shutil.copyfile(ROOT/'scripts'/name,self.root/'scripts'/name)
+        for name in ('start.cmd','stop.cmd'):shutil.copyfile(ROOT/name,self.root/name)
         for name in ('python.exe','pythonw.exe'):
             shutil.copyfile(ROOT/'.venv/Scripts'/name,self.root/'.venv/Scripts'/name)
         shutil.copyfile(ROOT/'.venv/pyvenv.cfg',self.root/'.venv/pyvenv.cfg')

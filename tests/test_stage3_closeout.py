@@ -183,6 +183,9 @@ class ProcessRaceTests(unittest.TestCase):
             watch.write_text("while (-not (Test-Path 'watcher-exit')) {\n"
                 " if (Test-Path 'attempt-old-start') { try { & \"$PSScriptRoot/start.ps1\" } catch {} ; 'attempted' | Set-Content 'watcher-attempted'; Remove-Item 'attempt-old-start' }\n"
                 " Start-Sleep -Milliseconds 100\n}\n", encoding='utf-8-sig')
+            manifest_path=self.root/'scripts/lifecycle-control.json'
+            manifest=json.loads(manifest_path.read_text());manifest['files']['scripts/login-watch.ps1']=launcher.control_digest(watch)
+            manifest_path.write_text(json.dumps(manifest))
             watcher = subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(watch)],
                 cwd=self.root,env=self.env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,**launcher.no_console_options())
             # Wait for watcher snapshot visibility before the guarded stop.

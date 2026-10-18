@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager, ExitStack
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,31 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+CONTROL_FILES = ('scripts/windows_background.py', 'team_bot/process_control.py',
+                 'scripts/common.ps1', 'scripts/start.ps1', 'scripts/stop.ps1',
+                 'scripts/login-watch.ps1', 'start.cmd', 'stop.cmd')
+
+
+def control_digest(path):
+    # Git uses CRLF for PowerShell/CMD and LF in archives; only normalize EOL.
+    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+
+
+def verify_controls(root, required=False):
+    pending = root / 'data/lifecycle-upgrade/pending.json'
+    if pending.exists(): raise RuntimeError('生命周期文件安装未完成；禁止启动/停止，请用原升级包继续安装')
+    path = root / 'scripts/lifecycle-control.json'
+    receipt = root / 'data/lifecycle-upgrade/complete.json'
+    if not path.exists() and not required and not receipt.exists(): return
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if data.get('protocol') != 1 or set(data['files']) != set(CONTROL_FILES): raise ValueError()
+        for name, digest in data['files'].items():
+            if (root/name).is_symlink() or control_digest(root/name) != digest: raise ValueError()
+        if receipt.exists():
+            if json.loads(receipt.read_text(encoding='utf-8'))['manifest'] != control_digest(path): raise ValueError()
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        raise RuntimeError('生命周期控制文件组不完整或版本不一致；未执行启动/停止，请重新核验完整升级包') from None
 
 
 def no_console_options() -> dict:
@@ -27,6 +53,7 @@ def no_console_options() -> dict:
 
 
 def monitor(root: Path = ROOT) -> int:
+    verify_controls(root)
     powershell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
     # The GUI launcher stays alive so Task Scheduler still supervises the watcher
     # and applies its existing restart policy. It does not start the bot itself.
@@ -149,6 +176,7 @@ def upgrade_control(data_path, root=ROOT, release=False):
     without -Recovery. Release requires the watcher to have exited first.
     """
     root, data_path = root.resolve(), data_path.resolve()
+    verify_controls(root, required=True)
     with lifecycle_lock(data_path):
         rows = snapshot(); bots = [r for r in rows if is_bot(r, root)]
         watchers = [r for r in rows if is_watcher(r, root)]
@@ -231,6 +259,7 @@ def cleanup_new_child(child, root, data_path):
 
 def start_bot(data_path: Path, root: Path = ROOT, recovery=False, resume=False) -> int:
     root, data_path = root.resolve(), data_path.resolve()
+    verify_controls(root)
     with lifecycle_lock(data_path):
         if upgrade_held(data_path, root): raise RuntimeError('升级暂停中；禁止守护或人工启动，先完成升级/回退步骤')
         if (data_path / 'autostart.stop').exists() and (recovery or not resume): raise RuntimeError('人工停止标记存在；监控不会重启，人工恢复请用 start.cmd（-Resume）')
@@ -277,6 +306,7 @@ def launch_and_publish(data_path, root):
 
 def stop_bot(data_path, root=ROOT, timeout=60, force=False, legacy_upgrade=False):
     root, data_path = root.resolve(), data_path.resolve()
+    verify_controls(root, required=legacy_upgrade)
     with lifecycle_lock(data_path):
         rows = snapshot(); bots = [r for r in rows if is_bot(r, root)]
         if len(bots) > 1: raise RuntimeError('发现多个本项目进程，请核查后处理，未强制停止')
@@ -317,7 +347,7 @@ def stop_bot(data_path, root=ROOT, timeout=60, force=False, legacy_upgrade=False
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("monitor", "start", "stop", "upgrade-hold", "upgrade-release"))
+    parser.add_argument("action", choices=("monitor", "start", "stop", "upgrade-hold", "upgrade-release", "check-controls"))
     parser.add_argument("--data-path", type=Path)
     parser.add_argument('--recovery', action='store_true')
     parser.add_argument('--force', action='store_true')
@@ -325,6 +355,8 @@ def main() -> int:
     parser.add_argument('--legacy-upgrade', action='store_true')
     parser.add_argument('--timeout', type=float, default=60)
     args = parser.parse_args()
+    if args.action == 'check-controls':
+        verify_controls(ROOT, required=True); print('完整生命周期控制文件组校验通过'); return 0
     if args.action == "monitor":
         return monitor()
     if args.data_path is None:
