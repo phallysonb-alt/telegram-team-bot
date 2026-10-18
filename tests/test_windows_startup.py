@@ -153,13 +153,13 @@ class WindowsStartupTests(unittest.TestCase):
             shutil.copy2(ROOT/'team_bot/process_control.py',module/'process_control.py')
             (module / "__main__.py").write_text(
                 "import ctypes,json,sys,time,os\nfrom pathlib import Path\n"
-                "from team_bot.process_control import ProcessRef,stop_requested\n"
+                "from team_bot.process_control import ProcessRef,stop_requested,stop_capability\n"
                 f"data=Path({str(data)!r})\n"
                 "if sys.argv[1]=='paths':print(data)\n"
                 "else:\n"
                 " k=ctypes.WinDLL('kernel32');a=(ctypes.c_ulong*16)()\n"
                 " (data/'native.json').write_text(json.dumps({'console_clients':k.GetConsoleProcessList(a,16)}))\n"
-                " with ProcessRef(os.getpid()) as me:\n"
+                " with ProcessRef(os.getpid()) as me,stop_capability(data,me):\n"
                 "  while not stop_requested(data/'stop-request.json',me.pid,me.birth):time.sleep(0.1)\n", encoding="utf8")
             ps = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
             def invoke(name):

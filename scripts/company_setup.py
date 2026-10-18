@@ -419,13 +419,13 @@ def db_check(root, v):
     return count
 
 
-def processes(root):
+def processes(root, timeout=25):
     if os.name != 'nt': raise SetupError('进程核验仅支持Windows。')
     # No secrets/command lines leave PowerShell; count launcher/interpreter as one tree.
     script = "$p=@(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.Name -in @('python.exe','pythonw.exe') -and $_.CommandLine -match 'team_bot\\s+run' }); $ids=@($p.ProcessId); @($p | Where-Object { $_.ParentProcessId -notin $ids } | Select-Object ProcessId,ExecutablePath) | ConvertTo-Json -Compress"
     try:
         p = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script],
-                           capture_output=True, text=True, timeout=25, creationflags=subprocess.CREATE_NO_WINDOW)
+                           capture_output=True, text=True, timeout=timeout, creationflags=subprocess.CREATE_NO_WINDOW)
         if p.returncode: raise ValueError()
         result = json.loads(p.stdout or '[]')
     except (OSError, ValueError, subprocess.TimeoutExpired): raise SetupError('无法读取Windows进程；未确认实例数量，请用相同用户重试。') from None
@@ -508,6 +508,49 @@ def diagnose(root, online=False, transport=request_json, process_probe=processes
     return results
 
 
+def wait_for_bridge(root, timeout=90, interval=3, probe=None, clock=time.monotonic, sleep=time.sleep):
+    """Bounded post-start readiness, not another installation or an auth bypass.
+
+    Recheck only process count and the existing read-only D1 heartbeat. Each
+    external operation shares the remaining deadline. No Telegram messages.
+    """
+    deadline = clock() + timeout
+    def current(remaining):
+        count, _ = processes(root, timeout=min(5, remaining))
+        if count != 1: return count, False
+        remaining = deadline - clock()
+        if remaining <= 0: return count, False
+        try:
+            output = json_output(Runner(root)(wrangler(root) + ['d1', 'execute', state(root)['database_name'], '--remote', '--json',
+                '--command', "SELECT value FROM bridge_state WHERE key='heartbeat'"], timeout=min(12, remaining)))
+        except SetupError:
+            return count, False  # Process proof remains valid if cloud probe times out.
+        try:
+            rows = output[0]['results']
+            online = output[0].get('success') is not False and bool(rows) and -5000 <= time.time()*1000 - float(rows[0]['value']) <= 30000
+        except (KeyError, IndexError, TypeError, ValueError):
+            raise SetupError('D1心跳检查返回异常；请检查Cloudflare连接。') from None
+        return count, online
+    probe = probe or current
+    running = None
+    while clock() < deadline:
+        try:
+            running, online = probe(deadline - clock())
+            if running != 1:
+                return [dict(item='机器人进程', status='失败', detail='启动后未核实到唯一运行实例；请检查本公司日志，不要重复安装。')]
+            if online:
+                return [dict(item='机器人进程', status='通过', detail='唯一实例正在运行'),
+                        dict(item='本地桥接', status='通过', detail='云端心跳已就绪；客户端仍需验收')]
+        except SetupError:
+            # A transient probe failure is not evidence the bot stopped.
+            running = None
+        remaining = deadline - clock()
+        if remaining > 0: sleep(min(interval, remaining))
+    return [dict(item='机器人进程', status='通过' if running == 1 else '待处理',
+                 detail='唯一实例正在运行' if running == 1 else '暂未能核实进程状态，请运行 check-company.cmd'),
+            dict(item='本地桥接', status='待处理', detail='限时等待结束，桥接尚未核实就绪；不要重复安装。运行 check-company.cmd 复查连接。')]
+
+
 def wizard(root, offline=False):
     state(root)
     v = configure(root)
@@ -549,11 +592,14 @@ def wizard(root, offline=False):
             raise SetupError('启动前检查尚未通过；按失败项目处理后重新运行，不会启动半配置实例。')
         local, _ = processes(root)
         if not local:
-            subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(root / 'scripts/start.ps1')], cwd=root, env=runtime_env(), check=True)
+            try:
+                subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(root / 'scripts/start.ps1'), '-Resume'], cwd=root, env=runtime_env(), check=True)
+            except (OSError, subprocess.CalledProcessError):
+                raise SetupError('机器人启动失败；配置保留，请检查本公司 logs/console-error.log 和 check-company.cmd，勿重复安装。') from None
         if input('是否安装当前Windows用户登录自启动？y/其他跳过：').lower() == 'y':
             subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(root / 'scripts/autostart.ps1'), 'install'], cwd=root, env=runtime_env(), check=True)
-        time.sleep(3)
-        final = diagnose(root, online=True)
+        print('机器人已启动/已在运行；正在限时等待云端桥接就绪（最多90秒）……')
+        final = wait_for_bridge(root)
         print_results(final)
         if any(x['status'] != '通过' for x in final): return 2
     else:

@@ -53,6 +53,12 @@ class ShiftConfigTests(Base):
 class BootstrapAndIsolationTests(Base, unittest.IsolatedAsyncioTestCase):
     make_update = fixtures.TelegramAdapterTests.make_update
 
+    def setUp(self):
+        super().setUp()
+        # These are session/identity isolation tests, not training import tests.
+        # A clean public checkout must not depend on a local demo document.
+        self.s.db.set('training_demo_disabled', True)
+
     async def test_general_route_preserves_absent_thread_and_unbound_is_distinct(self):
         self.emp()
         self.c.threads['report'] = 'general'

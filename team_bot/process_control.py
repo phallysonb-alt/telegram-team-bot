@@ -5,6 +5,7 @@ file cannot stop a later process that reuses the same PID.
 """
 import asyncio
 import ctypes
+from contextlib import contextmanager
 from ctypes import wintypes
 import json
 import os
@@ -24,7 +25,11 @@ class ProcessRef:
         k.CloseHandle.argtypes = [wintypes.HANDLE]
         self.pid = int(pid)
         self.handle = k.OpenProcess(0x1000 | 0x100000 | (1 if terminate else 0), False, self.pid)
-        if not self.handle: raise ProcessLookupError('进程已退出或无法核实身份')
+        if not self.handle:
+            error = ctypes.get_last_error()
+            if error in (87, 1168): raise ProcessLookupError('进程已退出')
+            # Access denied is not evidence of process exit.
+            raise OSError(error, '无法打开进程核实身份；请使用相同Windows用户')
         try:
             times = [wintypes.FILETIME() for _ in range(4)]
             if not k.GetProcessTimes(self.handle, *[ctypes.byref(t) for t in times]): raise OSError('无法读取进程创建时间')
@@ -64,10 +69,27 @@ def stop_requested(path, pid, birth):
 
 async def watch_stop(app, data):
     if os.name != 'nt': return
-    with ProcessRef(os.getpid()) as me:
+    with ProcessRef(os.getpid()) as me, stop_capability(data, me):
         while True:
             if app.running and stop_requested(Path(data) / 'stop-request.json', me.pid, me.birth):
                 # PTB drains queued handlers/persistence and invokes post_stop.
                 app.stop_running()
                 return
             await asyncio.sleep(.25)
+
+
+@contextmanager
+def stop_capability(data, me):
+    """Runtime handshake: copying new source over an old process is NOT enough."""
+    path = Path(data) / 'process.stop-capability.json'
+    value = dict(protocol=1, **me.identity())
+    temporary = path.with_name(path.name + '.' + str(me.pid) + '.tmp')
+    try:
+        temporary.write_text(json.dumps(value), encoding='utf-8')
+        os.replace(temporary, path)
+        yield
+    finally:
+        temporary.unlink(missing_ok=True)
+        try:
+            if json.loads(path.read_text(encoding='utf-8')) == value: path.unlink()
+        except FileNotFoundError: pass

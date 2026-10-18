@@ -16,7 +16,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch
-from team_bot.process_control import ProcessRef,stop_requested
+from team_bot.process_control import ProcessRef,stop_requested,stop_capability
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('stage3_launcher',ROOT/'scripts/windows_background.py')
@@ -45,21 +45,23 @@ class Stage3ProcessTests(unittest.TestCase):
         self.module.write_text('''import asyncio,json,os,sys,time
 from pathlib import Path
 from team_bot.maintenance import InstanceLock
-from team_bot.process_control import ProcessRef,stop_requested
+from team_bot.process_control import ProcessRef,stop_requested,stop_capability
 data=Path('fixture data')
 if sys.argv[1]=='paths':print(data.resolve());raise SystemExit(0)
 with InstanceLock(data),InstanceLock(Path('data/bot-global-lock')):
  (data/'started').write_text(str(os.getpid()))
- with ProcessRef(os.getpid()) as me:
+ with ProcessRef(os.getpid()) as me,stop_capability(data,me):
   while not stop_requested(data/'stop-request.json',me.pid,me.birth):time.sleep(.05)
  (data/'drained').write_text('complete')
 ''',encoding='utf-8')
         self.addCleanup(self.cleanup_service)
 
-    def invoke(self,action,timeout=6,force=False,recovery=False):
+    def invoke(self,action,timeout=6,force=False,recovery=False,resume=False,legacy_upgrade=False):
         args=[str(self.root/'.venv/Scripts/pythonw.exe'),str(self.root/'scripts/windows_background.py'),action,'--data-path',str(self.data),'--timeout',str(timeout)]
         if force:args.append('--force')
         if recovery:args.append('--recovery')
+        if resume:args.append('--resume')
+        if legacy_upgrade:args.append('--legacy-upgrade')
         return subprocess.run(args,cwd=self.root,env=self.env,capture_output=True,timeout=45,**launcher.no_console_options())
 
     def cleanup_service(self):
@@ -74,7 +76,7 @@ with InstanceLock(data),InstanceLock(Path('data/bot-global-lock')):
                 self.invoke('stop',timeout=1,force=True)
 
     def start(self):
-        p=self.invoke('start')
+        p=self.invoke('start',resume=True)
         self.assertEqual(p.returncode,0,p.stderr.decode('utf-8',errors='replace'))
         return int((self.data/'process.pid').read_text())
 
@@ -93,8 +95,8 @@ with InstanceLock(data),InstanceLock(Path('data/bot-global-lock')):
         try:
             (self.data/'process.pid').write_text(str(p.pid))
             result=self.invoke('stop',timeout=0,force=True)
-            self.assertNotEqual(result.returncode,0);self.assertIsNone(p.poll())
-            self.assertEqual((self.data/'process.pid').read_text(),str(p.pid))
+            self.assertEqual(result.returncode,0);self.assertIsNone(p.poll())
+            self.assertFalse((self.data/'process.pid').exists())
         finally:
             p.terminate();p.wait(timeout=10)
         # The same stale numeric file can be safely replaced once no process owns it.
@@ -190,7 +192,9 @@ async def entered(update,context):
  while not (data/'stop-request.json').exists():await asyncio.sleep(.05)
  await asyncio.sleep(.3)
  (data/'handler-committed').write_text('saved exactly once')
-async def init(app):app.bot_data['stop']=asyncio.create_task(watch_stop(app,data))
+async def init(app):
+ await asyncio.sleep(4.5)  # Initial startup exceeds the old 3-second threshold.
+ app.bot_data['stop']=asyncio.create_task(watch_stop(app,data))
 async def stopped(app):
  app.bot_data['stop'].cancel();await asyncio.gather(app.bot_data['stop'],return_exceptions=True)
  (data/'post-stop').touch()
