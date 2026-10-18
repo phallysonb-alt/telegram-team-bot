@@ -102,6 +102,10 @@ def run_checks(root,checks):
     for i,argv in enumerate(checks):
         # Receipts/commit messages use portable names, never local account paths.
         recorded=['{python}' if a==sys.executable else a for a in argv]
+        # Explicit Node paths were fail-closed by the privacy scan, but could
+        # not produce a portable receipt. Normalize the verified runtime too.
+        if Path(argv[0]).name.lower() in ('node', 'node.exe') and Path(argv[0]).is_absolute():
+            if Path(argv[0]).resolve() == Path(node_executable()).resolve(): recorded[0]='{node}'
         scan_blob('README.md',json.dumps(recorded).encode(),policy(root),known_values(root))
         actual=[sys.executable if a=='{python}' else node_executable() if a=='{node}' else a for a in recorded]
         print('运行相关检查 '+str(i+1)+'/'+str(len(checks)),flush=True)

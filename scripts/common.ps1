@@ -5,7 +5,7 @@ $PythonExe = Join-Path $ProjectRoot '.venv\Scripts\python.exe'
 $PythonWindowless = Join-Path $ProjectRoot '.venv\Scripts\pythonw.exe'
 $env:PYTHONUTF8 = '1'
 function Invoke-WindowlessPython {
-    param([string[]]$PythonArgs)
+    param([string[]]$PythonArgs, [switch]$ExplainFailure)
     # Windows PowerShell native-command invocation may allocate a console even
     # when its own parent has none. Explicitly suppress it for startup helpers.
     $QuotedArgs = foreach ($Argument in $PythonArgs) {
@@ -34,13 +34,16 @@ function Invoke-WindowlessPython {
         $OutputText = $OutputTask.Result
         $ErrorText = $ErrorTask.Result
         $global:LASTEXITCODE = $Child.ExitCode
-        if ($Child.ExitCode -ne 0) { throw "后台启动辅助程序失败（退出码 $($Child.ExitCode)），请检查配置及数据目录日志。" }
+        if ($Child.ExitCode -ne 0) {
+            if ($ExplainFailure -and $ErrorText.StartsWith('CONTROL: ') -and $ErrorText.Length -lt 1200) { throw $ErrorText.Substring(9).Trim() }
+            throw "后台启动辅助程序失败（退出码 $($Child.ExitCode)），请检查配置及数据目录日志。"
+        }
         if ($OutputText) { $OutputText.TrimEnd([char[]]"`r`n") -split '\r?\n' }
     } finally { $Child.Dispose() }
 }
 function Test-BotProcess {
     param($Candidate)
-    return ($Candidate -and $Candidate.ExecutablePath -in @($PythonExe, $PythonWindowless) -and $Candidate.CommandLine -like '*team_bot run*')
+    return ($Candidate -and $Candidate.ExecutablePath -in @($PythonExe, $PythonWindowless) -and $Candidate.CommandLine -match '(?:^|\s)-m\s+team_bot\s+run(?:\s|$)')
 }
 function Invoke-Bot {
     param([string[]]$BotArgs)

@@ -469,6 +469,8 @@ def diagnose(root, online=False, transport=request_json, process_probe=processes
         check('Mini App入口', binding)
     if not topics_verified(s, v):
         results.append(dict(item='话题路由', status='待处理', detail='仅配置数值，尚未真实验证；安装器可发送两条明确标记的路由检查消息。'))
+    else:
+        results.append(dict(item='话题路由', status='通过', detail='两个话题的安装验收回执均匹配本机器人和工作群'))
     if online:
         def telegram_check():
             current = verify_telegram(v, transport)
@@ -531,12 +533,19 @@ def wizard(root, offline=False):
     if not topics_verified(state(root), v):
         if input('允许向两个配置话题各发一条安装验收消息以核对路由？y/其他跳过：').lower() == 'y':
             verify_topics(root, v)
-    print_results(diagnose(root, online=True))
+        else:
+            print('配置已保存；话题待验证，尚不允许启动。再次运行 setup-company.cmd 可继续，只验证未完成的话题；这不是部署成功。')
+            return 2
+    checks = diagnose(root, online=True)
+    print_results(checks)
+    if not ready_to_start(checks):
+        print('配置已保存，但启动检查尚未通过。请处理上方失败/待处理项后重跑；未启动机器人。')
+        return 2
     print('电脑关机或休眠时本地业务服务停止；云端页面仍可打开，但无法保存。')
     if input('如确认本Bot未在其他电脑polling，输入 START 启动此新公司唯一验收实例（其余保留停止）：') == 'START':
         check = diagnose(root, online=True)
         # Bridge-offline is expected before first start; other failures block startup.
-        if any(x['status'] != '通过' for x in check if x['item'] != '本地桥接'):
+        if not ready_to_start(check):
             raise SetupError('启动前检查尚未通过；按失败项目处理后重新运行，不会启动半配置实例。')
         local, _ = processes(root)
         if not local:
@@ -544,12 +553,23 @@ def wizard(root, offline=False):
         if input('是否安装当前Windows用户登录自启动？y/其他跳过：').lower() == 'y':
             subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(root / 'scripts/autostart.ps1'), 'install'], cwd=root, env=runtime_env(), check=True)
         time.sleep(3)
-        print_results(diagnose(root, online=True))
+        final = diagnose(root, online=True)
+        print_results(final)
+        if any(x['status'] != '通过' for x in final): return 2
+    else:
+        print('配置及话题检查通过；本次未启动服务，实际客户端使用仍待验收。')
     return 0
 
 
 def print_results(results):
     for r in results: print('[' + r['status'] + '] ' + r['item'] + '：' + r['detail'])
+
+
+def ready_to_start(results):
+    # Offline local bridge is expected BEFORE the first start, not a bypass for
+    # permissions, D1, HTTPS, configuration or missing topic receipts.
+    required={'隔离配置','数据库及人员','单实例','Mini App入口','话题路由','Telegram身份/群/权限','HTTPS与桥接认证','D1连接'}
+    return required <= {x['item'] for x in results} and all(x['status'] == '通过' for x in results if x['item'] != '本地桥接')
 
 
 def main():

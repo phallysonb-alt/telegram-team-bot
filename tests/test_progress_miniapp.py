@@ -47,6 +47,15 @@ class MiniAppTests(unittest.IsolatedAsyncioTestCase):
         for bad,now in [(raw.replace('feedback_1','feedback_2'),1001),(raw,5000),(raw,800),(raw+'&user=x',1001)]:
             with self.assertRaises((PermissionError,ValueError)):validate_init_data(bad,token,now)
         with self.assertRaises(PermissionError):validate_init_data(signed(token,True,at=1000),token,1001)
+    def test_hmac_includes_telegram_signature_field_without_dropping_it(self):
+        from urllib.parse import parse_qsl,urlencode
+        fields=dict(parse_qsl(signed('mock-token',456,at=1000)))
+        fields.pop('hash');fields['signature']='simulated-ed25519-base64url-without-padding'
+        secret=hmac.new(b'WebAppData',b'mock-token',hashlib.sha256).digest()
+        fields['hash']=hmac.new(secret,'\n'.join(k+'='+v for k,v in sorted(fields.items())).encode(),hashlib.sha256).hexdigest()
+        self.assertEqual(validate_init_data(urlencode(fields),'mock-token',1001)[0]['id'],456)
+        fields['signature']+='x'
+        with self.assertRaises(PermissionError):validate_init_data(urlencode(fields),'mock-token',1001)
     async def test_membership_failure_and_disabled_employee(self):
         self.membership.side_effect=PermissionError('校验失败')
         with self.assertRaises(PermissionError):await self.request('feedback',self.u,dict(round=self.r))

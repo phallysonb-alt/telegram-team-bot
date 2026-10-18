@@ -91,6 +91,13 @@ class GitHubSyncTests(unittest.TestCase):
   checks=sync.checks_for(self.root,SimpleNamespace(profile='default',checks_json=None))
   self.assertTrue(any('tests/test_worker_stability.mjs' in command for command in checks))
   self.assertIn(['{python}','-m','team_bot','test'],checks)
+ def test_explicit_node_executable_is_normalized_before_scanning_receipt(self):
+  node=sync.node_executable()
+  result=sync.run_checks(self.root,[[node,'-e','process.exit(0)']])
+  self.assertEqual(result[0]['command'],['{node}','-e','process.exit(0)'])
+  self.assertNotIn(node,json.dumps(result));self.g('add','--all')
+  tid=sync.tree(self.root);sync.receipt(self.root,tid,result)
+  self.assertEqual(sync.require_receipt(self.root,tid)['checks'],result)
  def test_scan_outgoing_history_catches_removed_secret(self):
   old=self.commit();self.write('README.md','ghp_'+'A'*36);bad=self.commit();self.write('README.md','safe again');self.commit()
   guard.scan(self.root,'HEAD')

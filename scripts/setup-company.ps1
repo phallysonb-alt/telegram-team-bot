@@ -77,16 +77,40 @@ try {
     }
     & $VenvPython -c "import sys; sys.exit(0 if sys.version_info >= (3,12) else 1)"
     if ($LASTEXITCODE -ne 0) { throw '目标虚拟环境Python版本不足3.12；请保留数据并修复本公司.venv。' }
-    # Always use the target's interpreter and lockfile, never the source runtime.
-    & $VenvPython -m pip install --disable-pip-version-check -r (Join-Path $Target 'requirements.lock.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Python依赖安装失败；检查网络/代理，重新运行本入口继续。' }
+    # A verified dependency checkpoint lets pending topic validation resume
+    # without reinstalling the whole environment. Check health on every resume.
+    $PythonVersion = & $VenvPython -c "import sys; print(sys.version.split()[0])"
+    $NodeVersion = & $Node.Source --version
+    $DependencyKey = (Get-FileHash -LiteralPath (Join-Path $Target 'requirements.lock.txt') -Algorithm SHA256).Hash + ':' + (Get-FileHash -LiteralPath (Join-Path $Target 'deploy\package-lock.json') -Algorithm SHA256).Hash + ':' + $PythonVersion + ':' + $NodeVersion
+    $DependencyStamp = Join-Path $Target '.company-dependencies.txt'
+    $DepsReady = (Test-Path -LiteralPath $DependencyStamp) -and ((Get-Content -LiteralPath $DependencyStamp -Raw).Trim() -eq $DependencyKey)
     & $VenvPython -m pip check
-    if ($LASTEXITCODE -ne 0) { throw 'Python依赖冲突；请检查虚拟环境。' }
-    Push-Location (Join-Path $Target 'deploy')
-    try {
-        & $Npm.Source ci --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) { throw 'Node依赖安装失败；检查网络后重新运行，不会清空数据。' }
-    } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { $DepsReady = $false }
+    $DependencyProbe = @'
+import importlib.metadata as m,sys
+from pathlib import Path
+try:
+ rows=[x.strip().split('==') for x in Path(sys.argv[1]).read_text().splitlines() if x.strip() and not x.startswith('#')]
+ sys.exit(0 if all(m.version(name)==version for name,version in rows) else 1)
+except Exception: sys.exit(1)
+'@
+    & $VenvPython -c $DependencyProbe (Join-Path $Target 'requirements.lock.txt')
+    if ($LASTEXITCODE -ne 0) { $DepsReady = $false }
+    $Wrangler = Join-Path $Target 'deploy\node_modules\wrangler\bin\wrangler.js'
+    if (-not (Test-Path -LiteralPath $Wrangler)) { $DepsReady = $false }
+    elseif ($DepsReady) { & $Node.Source $Wrangler --version; if ($LASTEXITCODE -ne 0) { $DepsReady = $false } }
+    if (-not $DepsReady) {
+        & $VenvPython -m pip install --disable-pip-version-check -r (Join-Path $Target 'requirements.lock.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'Python依赖安装失败；检查网络/代理，重新运行本入口继续。' }
+        & $VenvPython -m pip check
+        if ($LASTEXITCODE -ne 0) { throw 'Python依赖冲突；请检查虚拟环境。' }
+        Push-Location (Join-Path $Target 'deploy')
+        try {
+            & $Npm.Source ci --no-audit --no-fund
+            if ($LASTEXITCODE -ne 0) { throw 'Node依赖安装失败；检查网络后重新运行，不会清空数据。' }
+        } finally { Pop-Location }
+        $DependencyKey | Set-Content -LiteralPath $DependencyStamp -Encoding UTF8
+    } else { Write-Host '依赖检查通过，直接继续未完成的配置/话题验证。' }
     $Arguments = @("$Target\scripts\company_setup.py", 'wizard')
     if ($Offline) { $Arguments += '--offline' }
     & $VenvPython @Arguments

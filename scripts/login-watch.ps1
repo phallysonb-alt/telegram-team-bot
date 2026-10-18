@@ -16,7 +16,7 @@ while (-not (Test-Path -LiteralPath $StopPath)) {
     if (-not $Running) {
         # Run within this console-free watcher, rather than creating another shell.
         # A failed recovery must not terminate the 30-second retry loop.
-        try { & "$PSScriptRoot\start.ps1" *> $null } catch { }
+        try { & "$PSScriptRoot\start.ps1" -Recovery *> $null } catch { }
     }
     Start-Sleep -Seconds 30
 }

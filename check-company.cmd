@@ -10,5 +10,6 @@ if not exist ".venv\Scripts\python.exe" (
 )
 ".venv\Scripts\python.exe" scripts\company_setup.py diagnose --online %*
 set RESULT=%errorlevel%
+if "%RESULT%"=="2" echo 仍有失败或待验证步骤；配置完成不等于服务可启动，请查看上方具体项目。
 pause
 exit /b %RESULT%

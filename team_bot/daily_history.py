@@ -215,15 +215,12 @@ def export_data(s):
 
 def write_excel(data,path):
     from .config import ROOT
-    # Artifact-tool is a Node dependency. Locate the installed desktop runtime or npm installation.
-    node=os.environ.get('DAILY_NODE') or shutil.which('node')
-    bundled=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node'
-    if not node and (bundled/'bin/node.exe').exists():node=str(bundled/'bin/node.exe')
-    if not node:raise RuntimeError('Excel导出需要Node.js与@oai/artifact-tool')
-    module=os.environ.get('DAILY_ARTIFACT_MODULE')
-    if not module and (bundled/'node_modules/@oai/artifact-tool').exists():module=str(bundled)
+    from .portable_excel import artifact_runtime,write_daily
+    runtime=artifact_runtime()
+    if runtime is None:return write_daily(data,path)
+    node,module=runtime
     env=dict(os.environ)
-    if module:env['DAILY_ARTIFACT_MODULE']=module
+    if module:env['DAILY_ARTIFACT_MODULE']=str(module)
     path.parent.mkdir(parents=True,exist_ok=True)
     token=uuid.uuid4().hex;source=path.parent/(token+'.json');temp=path.parent/(token+'.xlsx')
     source.write_text(dumps(data),encoding='utf-8')

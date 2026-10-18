@@ -165,6 +165,50 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(setup.state(self.root)['topic_receipts']), 2)
         self.assertEqual([p['message_thread_id'] for m, p in self.transport_calls if m == 'sendMessage'], [4, 2])
 
+    def ready(self):
+        return [dict(item=k,status='通过',detail='模拟已核验') for k in ('隔离配置','数据库及人员','单实例','Mini App入口','话题路由','Telegram身份/群/权限','HTTPS与桥接认证','D1连接')]
+
+    def test_full_wizard_normal_and_repeat_no_redeploy_or_repeat_topics(self):
+        cloud=FakeCloud()
+        with patch.object(setup,'verify_telegram',return_value=dict(username='company_example_bot')), \
+             patch.object(setup,'Runner',return_value=cloud),patch.object(setup,'wrangler',return_value=['node','wrangler']), \
+             patch.object(setup,'choose_account',return_value='f'*32), \
+             patch.object(setup,'verify_topics',side_effect=lambda root,v: setup_verify(root,v,self.transport)), \
+             patch.object(setup,'diagnose',return_value=self.ready()), \
+             patch('builtins.input',side_effect=['work','y','']),patch('builtins.print'):
+            self.assertEqual(setup.wizard(self.root),0)
+        sent=len(self.transport_calls)
+        with patch.object(setup,'verify_telegram',return_value=dict(username='company_example_bot')), \
+             patch.object(setup,'deploy_cloud') as deploy,patch.object(setup,'initialize',wraps=setup.initialize), \
+             patch.object(setup,'diagnose',return_value=self.ready()),patch('builtins.input',side_effect=['']),patch('builtins.print'):
+            self.assertEqual(setup.wizard(self.root),0);deploy.assert_not_called()
+        self.assertEqual(len(self.transport_calls),sent)
+
+    def test_wizard_skip_then_resume_topics_without_start_prompt(self):
+        s=setup.state(self.root);s.update(origin='https://example.workers.dev',bot_id='3456789');s['steps']['cloud']=True;setup.save_state(self.root,s)
+        self.v.update(BOT_USERNAME='company_example_bot',PROGRESS_MINIAPP_ORIGIN=s['origin'],PROGRESS_MINIAPP_BRIDGE='true')
+        setup.attach_miniapp(self.root,self.v,'work')
+        with patch.object(setup,'verify_telegram',return_value=dict(username='company_example_bot')), \
+             patch.object(setup,'diagnose') as diagnosis, patch('builtins.input',side_effect=['n']) as ask,patch('builtins.print') as output:
+            self.assertEqual(setup.wizard(self.root),2);diagnosis.assert_not_called()
+            self.assertEqual(ask.call_count,1)
+            self.assertTrue(any('话题待验证' in str(c) for c in output.call_args_list))
+        with patch.object(setup,'verify_telegram',return_value=dict(username='company_example_bot')), \
+             patch.object(setup,'deploy_cloud') as deploy, \
+             patch.object(setup,'verify_topics',side_effect=lambda root,v: setup_verify(root,v,self.transport)), \
+             patch.object(setup,'diagnose',return_value=self.ready()),patch('builtins.input',side_effect=['y','']),patch('builtins.print'):
+            self.assertEqual(setup.wizard(self.root),0);deploy.assert_not_called()
+        self.assertTrue(setup.topics_verified(setup.state(self.root),self.v))
+
+    def test_start_gate_rejects_incomplete_or_denied_checks(self):
+        self.assertFalse(setup.ready_to_start([]))
+        self.assertFalse(setup.ready_to_start([dict(item='本地桥接',status='失败')]))
+        for item in self.ready():
+            checks=self.ready()
+            next(x for x in checks if x['item']==item['item'])['status']='待处理'
+            self.assertFalse(setup.ready_to_start(checks))
+        self.assertTrue(setup.ready_to_start(self.ready()+[dict(item='本地桥接',status='失败')]))
+
     def test_cloud_resume_no_duplicate_d1_secret_stdin_and_no_bootstrap(self):
         cloud = FakeCloud(fail='deploy')
         account = 'f' * 32
@@ -279,4 +323,5 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('missing-python-node-handled', p.stdout)
 
 
+setup_verify=setup.verify_topics
 if __name__ == '__main__': unittest.main()

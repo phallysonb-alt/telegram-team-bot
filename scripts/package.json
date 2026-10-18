@@ -1,5 +1,5 @@
 {
   "private": true,
   "type": "module",
-  "dependencies": { "@oai/artifact-tool": "*" }
+  "description": "Optional legacy Excel scripts. No npm install is required here; standard deployments use locked Python openpyxl. Existing externally supplied artifact-tool remains supported."
 }

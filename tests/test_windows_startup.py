@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,12 +19,17 @@ spec.loader.exec_module(launcher)
 
 @unittest.skipUnless(os.name == "nt", "Windows startup plumbing")
 class WindowsStartupTests(unittest.TestCase):
+    def mock_row(self, root):
+        return dict(ProcessId=9876,ExecutablePath=str(root / '.venv/Scripts/pythonw.exe'),CommandLine='pythonw -m team_bot run',Birth=1230)
+
     def test_bot_launcher_retains_pid_logs_and_no_console_flag(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             child = Mock(pid=9876)
             child.poll.return_value = None
-            with patch.object(launcher.subprocess, "Popen", return_value=child) as start, \
+            with patch.object(launcher, 'snapshot', side_effect=[[], [self.mock_row(root)]]), \
+                    patch.object(launcher, 'checked_ref', return_value=SimpleNamespace(identity=lambda:dict(pid=9876,birth=1230))), \
+                    patch.object(launcher.subprocess, "Popen", return_value=child) as start, \
                     patch.object(launcher.time, "sleep"):
                 self.assertEqual(launcher.start_bot(root / "data", root), 9876)
             self.assertEqual((root / "data/process.pid").read_text(), "9876")
@@ -36,7 +42,8 @@ class WindowsStartupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             child = Mock(pid=9876)
             child.poll.return_value = 1
-            with patch.object(launcher.subprocess, "Popen", return_value=child), \
+            with patch.object(launcher, 'snapshot', return_value=[]), \
+                    patch.object(launcher.subprocess, "Popen", return_value=child), \
                     patch.object(launcher.time, "sleep"):
                 with self.assertRaisesRegex(RuntimeError, "启动失败"):
                     launcher.start_bot(Path(td) / "data", Path(td))
@@ -44,12 +51,17 @@ class WindowsStartupTests(unittest.TestCase):
     def test_pid_write_failure_cleans_up_only_new_child(self):
         with tempfile.TemporaryDirectory() as td:
             child = Mock(pid=9876)
-            with patch.object(launcher.subprocess, "Popen", return_value=child), \
+            child.poll.return_value = None
+            root=Path(td)
+            with patch.object(launcher, 'snapshot', side_effect=[[], [self.mock_row(root)]]), \
+                    patch.object(launcher, 'checked_ref', return_value=SimpleNamespace(identity=lambda:dict(pid=9876,birth=1230))), \
+                    patch.object(launcher, 'cleanup_new_child') as cleanup, \
+                    patch.object(launcher.time, 'sleep'), \
+                    patch.object(launcher.subprocess, "Popen", return_value=child), \
                     patch.object(launcher.os, "replace", side_effect=OSError("fixture")):
                 with self.assertRaises(OSError):
                     launcher.start_bot(Path(td) / "data", Path(td))
-            child.terminate.assert_called_once()
-            child.wait.assert_called_once()
+            cleanup.assert_called_once_with(child,root,root/'data')
 
     def test_monitor_propagates_exit_for_task_scheduler_retry(self):
         with tempfile.TemporaryDirectory() as td:
@@ -138,18 +150,21 @@ class WindowsStartupTests(unittest.TestCase):
             module = root / "team_bot"
             module.mkdir()
             (module / "__init__.py").write_text("")
+            shutil.copy2(ROOT/'team_bot/process_control.py',module/'process_control.py')
             (module / "__main__.py").write_text(
-                "import ctypes,json,sys,time\nfrom pathlib import Path\n"
+                "import ctypes,json,sys,time,os\nfrom pathlib import Path\n"
+                "from team_bot.process_control import ProcessRef,stop_requested\n"
                 f"data=Path({str(data)!r})\n"
                 "if sys.argv[1]=='paths':print(data)\n"
                 "else:\n"
                 " k=ctypes.WinDLL('kernel32');a=(ctypes.c_ulong*16)()\n"
                 " (data/'native.json').write_text(json.dumps({'console_clients':k.GetConsoleProcessList(a,16)}))\n"
-                " while True:time.sleep(0.1)\n", encoding="utf8")
+                " with ProcessRef(os.getpid()) as me:\n"
+                "  while not stop_requested(data/'stop-request.json',me.pid,me.birth):time.sleep(0.1)\n", encoding="utf8")
             ps = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
             def invoke(name):
                 return subprocess.run([str(ps), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(scripts/name)],
-                                      cwd=root, capture_output=True, timeout=20, **launcher.no_console_options())
+                                      cwd=root, capture_output=True, timeout=45, **launcher.no_console_options())
             try:
                 first = invoke("start.ps1")
                 self.assertEqual(first.returncode, 0, first.stderr.decode(errors="replace"))

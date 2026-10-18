@@ -646,6 +646,8 @@ def run(service):
         from .acceptance_views import display_adapter
         display_adapter(adapter)
     async def startup(app):
+        from .process_control import watch_stop
+        app.bot_data['process_stop_task'] = asyncio.create_task(watch_stop(app, service.c.data))
         service.c.bot_username=app.bot.username
         commands = [BotCommand('start', '开始使用'), BotCommand('whereami', '查看本人、群和话题 ID'), BotCommand('help', '使用帮助')]
         if service.c.owner:
@@ -678,6 +680,10 @@ def run(service):
         await start_desktop_sync(app,service)
 
     async def shutdown(app):
+        process_stop = app.bot_data.pop('process_stop_task', None)
+        if process_stop:
+            process_stop.cancel()
+            await asyncio.gather(process_stop, return_exceptions=True)
         from .desktop_sync import stop as stop_desktop_sync
         await stop_desktop_sync(app)
         member_task=app.bot_data.pop('member_task',None)

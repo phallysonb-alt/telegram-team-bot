@@ -12,6 +12,10 @@ const msg='123456789:WebAppData\n'+Object.keys(fields).sort().map(k=>k+'='+field
 fields.signature=sign(null,Buffer.from(msg),privateKey).toString('base64url');fields.hash='mock';
 const raw=new URLSearchParams(fields).toString();
 assert.equal(await mod.verify(raw,at,hex,'123456789'),1234);
+assert.equal(fields.signature.includes('='),false);
+assert.equal(await mod.verify(new URLSearchParams({...fields,signature:fields.signature+'=='}).toString(),at,hex,'123456789'),1234);
+await assert.rejects(mod.verify(raw,at,hex,'123456788'));
+await assert.rejects(mod.verify(new URLSearchParams({...fields,signature:'abc'}).toString(),at,hex,'123456789'));
 await assert.rejects(mod.verify(raw.replace('feedback_1','feedback_2'),at,hex,'123456789'));
 await assert.rejects(mod.verify(raw,at+3601,hex,'123456789'));
 await assert.rejects(mod.verify(raw+'&user=x',at,hex,'123456789'));
@@ -23,4 +27,4 @@ assert.equal(r.status,403);assert.equal(dbCalls,0);
 const boot=await mod.default.fetch(new Request('https://example.test/bridge/bootstrap',{method:'POST'}),{DB:db,BOOTSTRAP_ALLOWED:'false'});
 assert.equal(boot.status,403);assert.equal(dbCalls,0);
 const page=await mod.default.fetch(new Request('https://example.test/'),{});assert.equal(page.status,200);assert(!((await page.text()).includes('mock-token')));
-console.log('8 edge checks passed: Ed25519, tampering, expiry, duplicate fields, missing signature, unauthenticated no-DB access, disabled bootstrap, public static page.');
+console.log('11 edge checks passed: Ed25519, unpadded/padded base64url, bot identity, invalid length, tampering, expiry, duplicate fields, missing signature, unauthenticated no-DB access, disabled bootstrap, public static page.');

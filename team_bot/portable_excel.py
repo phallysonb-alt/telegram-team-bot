@@ -1,17 +1,22 @@
 """Optional independent-company export provider; frozen daily logic is unchanged."""
-import os,uuid,zipfile,math
+import os,uuid,zipfile,math,shutil
 from pathlib import Path
 from datetime import date
-def available_artifact():
+def artifact_runtime():
  from .config import ROOT
- paths=[Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node',ROOT/'scripts']
+ bundled=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node'
+ paths=[bundled,ROOT/'scripts']
  if os.getenv('DAILY_ARTIFACT_MODULE'):paths=[Path(os.environ['DAILY_ARTIFACT_MODULE'])]
- return any((p/'node_modules/@oai/artifact-tool').exists() for p in paths)
+ node=os.getenv('DAILY_NODE') or shutil.which('node')
+ if not node and (bundled/'bin/node.exe').is_file():node=str(bundled/'bin/node.exe')
+ module=next((p for p in paths if (p/'node_modules/@oai/artifact-tool').exists()),None)
+ return (node,module) if node and module else None
+
+def available_artifact():return artifact_runtime() is not None
+
 def install_if_missing():
- if available_artifact():return False
- from . import daily_history
- daily_history.write_excel=write_daily
- return True
+ # Retain entrypoint API; select per call instead of monkeypatching globally.
+ return not available_artifact()
 def write_daily(data,destination):
  from openpyxl import Workbook
  from openpyxl.styles import Font,PatternFill,Border,Side,Alignment
